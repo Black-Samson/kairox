@@ -96,7 +96,7 @@ export function parseRules(text: string, snapshot: AgentSnapshot): Omit<CopilotR
   const changed = Object.keys(patch).length > 0 || action !== null;
   let reply: string;
   if (changed) {
-    reply = "Done.";
+    reply = action === "pause" ? "Pausing new entries." : action === "resume" ? "Resuming the agent." : action === "close_all" ? "Closing everything now." : "Updated your strategy.";
   } else if (/pnl|profit|loss|how (am i|are we) doing|performance/.test(t)) {
     reply = describePnl(snapshot);
   } else if (/position|holding|open/.test(t)) {
