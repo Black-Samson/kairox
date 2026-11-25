@@ -22,11 +22,12 @@ const KEYFRAMES: [number, number, number][] = [
   [40, 1.03, 0.15],
   [48, 1.042, -0.05],
   [60, 1.04, 0.02],
-  // Act 2 — discount appears during a sell-off, then the dump continues -> STOP LOSS
-  [70, 1.035, 0.55],
-  [74, 1.03, 0.65],
-  [90, 1.0, 0.3],
-  [100, 0.99, 0.1],
+  // Act 2 — discount opens in a calm market, then the market dumps -> STOP LOSS
+  [66, 1.042, 0.55],
+  [70, 1.043, 0.62],
+  [74, 1.041, 0.45],
+  [86, 1.0, 0.2],
+  [96, 0.99, 0.1],
   [112, 0.995, 0.05],
   // Act 3 — premium on DEX (long-only agent skips)
   [120, 1.0, -0.6],
