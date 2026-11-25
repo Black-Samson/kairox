@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@theme {
+  --color-obsidian: #0b0e14;
+  --color-surface: #131822;
+  --color-raised: #1b2230;
+  --color-raised-hover: #232c3d;
+  --color-cyan: #00f0ff;
+  --color-emerald: #10b981;
+  --color-crimson: #f43f5e;
+  --color-ink: #090d16;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+html,
+body {
+  background: var(--color-obsidian);
+  color: #e6e9ef;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Bento card surface */
+.card {
+  background: var(--color-surface);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+}
+
+.card-title {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(230, 233, 239, 0.55);
+  font-weight: 600;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin scrollbars inside cards */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+/* Range slider */
+input[type="range"].kx-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-cyan) 0%,
+    var(--color-cyan) var(--fill, 50%),
+    rgba(255, 255, 255, 0.1) var(--fill, 50%)
+  );
+  outline: none;
+  transition: background 300ms ease;
+}
+input[type="range"].kx-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid var(--color-cyan);
+  cursor: pointer;
+}
+input[type="range"].kx-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid var(--color-cyan);
+  cursor: pointer;
+}
+
+@keyframes kx-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgba(0, 240, 255, 0);
+  }
+}
+.kx-flash {
+  animation: kx-flash 0.9s ease-out;
+}
+
+@keyframes kx-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.kx-pulse {
+  animation: kx-pulse 1.6s ease-in-out infinite;
+}
