@@ -12,3 +12,4 @@ contracts/cache/
 contracts/typechain-types/
 contracts/coverage/
 .DS_Store
+agent-journal.jsonl
