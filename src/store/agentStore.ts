@@ -325,7 +325,10 @@ export const useAgentStore = create<AgentState>()(
         const reason = `Buy ${pair}: ${describeSignal(signal)}`;
         if (!check.ok) {
           const failed = check.checks.filter((c) => !c.pass).map((c) => c.rule);
-          log({ pair, kind: "REJECTED", summary: `Signal OK but guardrails blocked entry: ${failed.join(", ")}`, signal, checks: check.checks });
+          const summary = `Signal OK but guardrails blocked entry: ${failed.join(", ")}`;
+          const prev = s.logs.find((l) => l.pair === pair && l.kind === "REJECTED");
+          if (prev && prev.summary === summary && Date.now() - prev.time < 15_000) return; // don't spam identical rejections
+          log({ pair, kind: "REJECTED", summary, signal, checks: check.checks });
           return;
         }
         const record: DecisionRecord = {
@@ -570,6 +573,7 @@ export const useAgentStore = create<AgentState>()(
               // 2. Look for entries.
               const cur = get();
               if (cur.paused || !cur.config.pairs.includes(pair)) continue;
+              if (cur.positions.some((p) => p.pair === pair)) continue; // already in a position on this pair
               if (signal.direction === "long") {
                 await tryEntry(pair, tick, signal);
               } else if (signal.spreadPct >= cur.config.entrySpreadPct * 0.75 || signal.spreadPct <= -cur.config.entrySpreadPct) {
