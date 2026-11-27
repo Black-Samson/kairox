@@ -7,7 +7,8 @@
     "test": "hardhat test",
     "test:offline": "SOLC_LOCAL=1 hardhat test",
     "deploy:testnet": "hardhat run scripts/deploy.ts --network hashkeyTestnet",
-    "deploy:mainnet": "hardhat run scripts/deploy.ts --network hashkey"
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network hashkey",
+    "deploy:testnet-mocks": "hardhat run scripts/deploy-testnet-mocks.ts --network hashkeyTestnet"
   },
   "keywords": [],
   "author": "",
