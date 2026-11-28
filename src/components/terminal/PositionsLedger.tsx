@@ -24,7 +24,39 @@ function Positions() {
 
   return (
     <div className="space-y-4">
-      <table className="w-full text-left text-xs">
+      {/* Phones: one card per position */}
+      <div className="space-y-2 md:hidden">
+        {positions.length === 0 && (
+          <p className="py-6 text-center text-xs text-white/35">No open positions — scanning HSKSwap for a discount to the reference price.</p>
+        )}
+        {positions.map((p) => {
+          const pct = ((p.markPrice - p.entryPrice) / p.entryPrice) * 100;
+          return (
+            <div key={p.id} className="rounded-xl border border-white/10 bg-obsidian/40 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-semibold text-white">{p.pair}</span>
+                <span className={`num text-sm font-semibold ${pnlClass(p.unrealizedPnlUsd)}`}>
+                  {fmtSigned(p.unrealizedPnlUsd)} <span className="text-xs text-white/40">({fmtSigned(pct)}%)</span>
+                </span>
+              </div>
+              <div className="num grid grid-cols-3 gap-2 text-[11px]">
+                <div><p className="font-sans text-[9px] uppercase text-white/35">Entry</p><p className="text-cyan">{fmtPrice(p.entryPrice)}</p></div>
+                <div><p className="font-sans text-[9px] uppercase text-white/35">Mark</p><p className="text-white/80">{fmtPrice(p.markPrice)}</p></div>
+                <div><p className="font-sans text-[9px] uppercase text-white/35">Size</p><p className="text-white/80">{p.sizeBase.toFixed(2)}</p></div>
+                <div><p className="font-sans text-[9px] uppercase text-white/35">Stop-loss</p><p className="text-crimson">{fmtPrice(p.stopLossPrice)}</p></div>
+                <div><p className="font-sans text-[9px] uppercase text-white/35">Take-profit</p><p className="text-emerald">{fmtPrice(p.takeProfitPrice)}</p></div>
+                <div className="flex items-end justify-end">
+                  <button onClick={() => void closePosition(p.id, "MANUAL")} className="rounded-md border border-white/15 px-3 py-1.5 font-sans text-[11px] text-white/80 active:border-crimson/50 active:text-crimson">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <table className="hidden w-full text-left text-xs md:table">
         <thead className="text-[10px] uppercase tracking-wider text-white/35">
           <tr>
             <th className="py-1.5 font-medium">Pair</th>
@@ -77,11 +109,11 @@ function Positions() {
               {closed.slice(0, 20).map((c) => (
                 <tr key={c.id} className="border-t border-white/5 text-white/70">
                   <td className="py-1.5 font-sans">{fmtTime(c.closedAt)}</td>
-                  <td className="font-sans">{c.pair}</td>
+                  <td className="hidden font-sans sm:table-cell">{c.pair}</td>
                   <td>
                     {fmtPrice(c.entryPrice)} → {fmtPrice(c.exitPrice)}
                   </td>
-                  <td className="font-sans text-[10px] uppercase text-white/45">{c.exitReason.replace("_", " ")}</td>
+                  <td className="hidden font-sans text-[10px] uppercase text-white/45 sm:table-cell">{c.exitReason.replace("_", " ")}</td>
                   <td className={`text-right ${pnlClass(c.realizedPnlUsd)}`}>{fmtSigned(c.realizedPnlUsd)} USDT</td>
                 </tr>
               ))}
@@ -101,14 +133,14 @@ function Logs() {
     <ul className="space-y-1.5">
       {logs.map((l) => (
         <li key={l.id} className="rounded-lg border border-white/5 bg-obsidian/40 px-2.5 py-2">
-          <button className="flex w-full items-start gap-2 text-left" onClick={() => setOpen(open === l.id ? null : l.id)}>
+          <button className="flex w-full flex-wrap items-start gap-2 text-left sm:flex-nowrap" onClick={() => setOpen(open === l.id ? null : l.id)}>
             <span className="num mt-0.5 shrink-0 text-[10px] text-white/35">{fmtTime(l.time)}</span>
             <span className={`mt-0.5 shrink-0 rounded px-1.5 py-px text-[9px] font-bold tracking-wider ${KIND_STYLE[l.kind]}`}>{l.kind}</span>
             <span className="text-xs leading-relaxed text-white/80">{l.summary}</span>
             {(l.checks || l.signal) && <span className="ml-auto shrink-0 text-[10px] text-white/30">{open === l.id ? "▲" : "▼"}</span>}
           </button>
           {open === l.id && (
-            <div className="mt-2 space-y-2 pl-[88px]">
+            <div className="mt-2 space-y-2 sm:pl-[88px]">
               {l.signal && (
                 <p className="num text-[11px] text-white/50">
                   spread {l.signal.spreadPct.toFixed(3)}% · momentum {l.signal.momentumPct.toFixed(3)}% · vol {l.signal.volatilityPct.toFixed(3)}% · score{" "}
@@ -138,7 +170,32 @@ function Receipts() {
   const receipts = useAgentStore((s) => s.receipts);
   if (!receipts.length) return <p className="py-6 text-center text-xs text-white/35">Executed swaps and their on-chain receipts appear here.</p>;
   return (
-    <table className="w-full text-left text-xs">
+    <>
+    <ul className="space-y-2 md:hidden">
+      {receipts.map((r) => (
+        <li key={r.id} className="rounded-xl border border-white/10 bg-obsidian/40 p-3 text-xs">
+          <div className="mb-1 flex items-center justify-between">
+            <span className={`font-bold ${r.side === "BUY" ? "text-cyan" : "text-emerald"}`}>
+              {r.side} <span className="font-normal text-white/60">{r.pair}</span>
+            </span>
+            <span className="num text-white/40">{fmtTime(r.time)}</span>
+          </div>
+          <p className="num text-white/75">
+            {r.amountIn.toFixed(2)} → {r.amountOut.toFixed(2)} @ {fmtPrice(r.price)}
+          </p>
+          <p className="mt-1">
+            {r.txHash ? (
+              <a href={explorerTx(r.txHash)} target="_blank" rel="noreferrer" className="num text-cyan underline-offset-2">
+                {shortAddr(r.txHash)} ↗ view on explorer
+              </a>
+            ) : (
+              <span className="num text-white/35">SIMULATED · {shortAddr(r.reasonHash)}</span>
+            )}
+          </p>
+        </li>
+      ))}
+    </ul>
+    <table className="hidden w-full text-left text-xs md:table">
       <thead className="text-[10px] uppercase tracking-wider text-white/35">
         <tr>
           <th className="py-1.5 font-medium">Time</th>
@@ -174,16 +231,17 @@ function Receipts() {
         ))}
       </tbody>
     </table>
+    </>
   );
 }
 
 export function PositionsLedger() {
   const [tab, setTab] = useState<Tab>("positions");
   const nPositions = useAgentStore((s) => s.positions.length);
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "positions", label: `Active Positions & Live PnL${nPositions ? ` (${nPositions})` : ""}` },
-    { id: "logs", label: "Agent Decision Logs" },
-    { id: "receipts", label: "On-Chain Receipts" },
+  const tabs: { id: Tab; label: string; long?: string }[] = [
+    { id: "positions", label: `Positions${nPositions ? ` (${nPositions})` : ""}`, long: `Active Positions & Live PnL${nPositions ? ` (${nPositions})` : ""}` },
+    { id: "logs", label: "Decisions", long: "Agent Decision Logs" },
+    { id: "receipts", label: "Receipts", long: "On-Chain Receipts" },
     { id: "vault", label: "Vault" },
   ];
   return (
@@ -195,7 +253,8 @@ export function PositionsLedger() {
             onClick={() => setTab(t.id)}
             className={`-mb-px shrink-0 border-b-2 px-3 pb-2 text-xs font-semibold ${tab === t.id ? "border-cyan text-white" : "border-transparent text-white/40 hover:text-white/70"}`}
           >
-            {t.label}
+            <span className="md:hidden">{t.label}</span>
+            <span className="hidden md:inline">{t.long ?? t.label}</span>
           </button>
         ))}
       </div>
