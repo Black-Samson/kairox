@@ -9,7 +9,12 @@ export const metadata: Metadata = {
     "Kairox is an autonomous AI DeFi trading terminal for HSKSwap on HashKey Chain, with on-chain vault guardrails, a conversational strategy copilot and a judge sandbox.",
 };
 
-export const viewport: Viewport = { themeColor: "#0B0E14" };
+export const viewport: Viewport = {
+  themeColor: "#0B0E14",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover", // lets the mobile tab bar sit above the iPhone home indicator
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

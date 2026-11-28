@@ -112,3 +112,33 @@ input[type="range"].kx-range::-moz-range-thumb {
 .kx-pulse {
   animation: kx-pulse 1.6s ease-in-out infinite;
 }
+
+/* Horizontal scrollers without a visible bar (mobile header) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Phones: 16px inputs stop iOS Safari from zooming in on focus; bigger slider thumbs for fingers. */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+  input[type="range"].kx-range::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+  }
+  input[type="range"].kx-range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+  }
+  html,
+  body {
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
