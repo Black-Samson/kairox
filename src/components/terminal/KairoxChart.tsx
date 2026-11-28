@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
   createChart,
   createSeriesMarkers,
   CrosshairMode,
+  HistogramSeries,
   LineSeries,
   LineStyle,
   type AutoscaleInfo,
@@ -18,17 +19,51 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { fmtPct, fmtPrice } from "@/lib/format";
+import type { Candle } from "@/lib/agent/types";
+import { TIMEFRAME_IDS } from "@/lib/market/timeframes";
 import { useAgentStore } from "@/store/agentStore";
 
 const CYAN = "#00F0FF";
 const EMERALD = "#10B981";
 const CRIMSON = "#F43F5E";
 
+const fmtVol = (v?: number) =>
+  v === undefined ? "—" : v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : v.toFixed(0);
+
+/** O / H / L / C / change / volume readout for the hovered (or latest) candle. */
+function OhlcReadout({ c }: { c?: Candle }) {
+  if (!c) return null;
+  const ch = ((c.close - c.open) / c.open) * 100;
+  const tone = ch >= 0 ? "text-emerald" : "text-crimson";
+  const Item = ({ k, v }: { k: string; v: string }) => (
+    <span>
+      <span className="text-white/35">{k}</span> <span className={tone}>{v}</span>
+    </span>
+  );
+  return (
+    <span className="num flex flex-wrap items-center gap-x-2.5 text-[11px]">
+      <Item k="O" v={fmtPrice(c.open)} />
+      <Item k="H" v={fmtPrice(c.high)} />
+      <Item k="L" v={fmtPrice(c.low)} />
+      <Item k="C" v={fmtPrice(c.close)} />
+      <span className={tone}>{fmtPct(ch, 2)}</span>
+      {c.volume !== undefined && c.volume > 0 && (
+        <span>
+          <span className="text-white/35">Vol</span> <span className="text-white/70">{fmtVol(c.volume)}</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function KairoxChart() {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const refLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const candlesRef = useRef<Candle[]>([]);
+  const [hovered, setHovered] = useState<Candle | undefined>();
   const markersRef = useRef<ISeriesMarkersPluginApi<UTCTimestamp> | null>(null);
   const priceLinesRef = useRef<IPriceLine[]>([]);
   const lastPairRef = useRef<string>("");
@@ -41,6 +76,9 @@ export function KairoxChart() {
   const interval = useAgentStore((s) => s.candleIntervalSec);
   const candleSource = useAgentStore((s) => s.candleSource);
   const signal = useAgentStore((s) => s.signals[s.pair]);
+  const timeframe = useAgentStore((s) => s.timeframe);
+  const setTimeframe = useAgentStore((s) => s.setTimeframe);
+  const replay = useAgentStore((s) => s.dataSource === "replay");
   const last = ticks.at(-1);
 
   // Create chart once.
@@ -99,15 +137,33 @@ export function KairoxChart() {
       crosshairMarkerVisible: false,
       priceFormat: { type: "price", precision: 5, minMove: 0.00001 },
     });
+    // Volume pane: bottom ~20% of the chart, on its own scale.
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      priceScaleId: "vol",
+      priceFormat: { type: "volume" },
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.08, bottom: 0.24 } });
+
+    // OHLC readout follows the crosshair; falls back to the latest candle.
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time) return setHovered(undefined);
+      setHovered(candlesRef.current.find((c) => c.time === param.time));
+    });
+
     chartRef.current = chart;
     candleRef.current = candleSeries;
     refLineRef.current = refSeries;
+    volumeRef.current = volumeSeries;
     markersRef.current = createSeriesMarkers(candleSeries, []) as ISeriesMarkersPluginApi<UTCTimestamp>;
     return () => {
       chart.remove();
       chartRef.current = null;
       candleRef.current = null;
       refLineRef.current = null;
+      volumeRef.current = null;
       markersRef.current = null;
       priceLinesRef.current = [];
     };
@@ -117,12 +173,22 @@ export function KairoxChart() {
   useEffect(() => {
     const s = candleRef.current;
     if (!s) return;
-    s.setData(candles.map((c) => ({ ...c, time: c.time as UTCTimestamp })));
-    if (lastPairRef.current !== pair) {
+    candlesRef.current = candles;
+    s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close })));
+    volumeRef.current?.setData(
+      candles.map((c) => ({
+        time: c.time as UTCTimestamp,
+        value: c.volume ?? 0,
+        color: c.close >= c.open ? "rgba(16,185,129,0.35)" : "rgba(244,63,94,0.35)",
+      })),
+    );
+    const key = `${pair}:${interval}`;
+    if (lastPairRef.current !== key && candles.length) {
+      chartRef.current?.timeScale().applyOptions({ timeVisible: interval < 86_400, secondsVisible: interval < 60 });
       chartRef.current?.timeScale().fitContent();
-      lastPairRef.current = pair;
+      lastPairRef.current = key;
     }
-  }, [candles, pair]);
+  }, [candles, pair, interval]);
 
   // Reference price overlay (one point per candle bucket).
   useEffect(() => {
@@ -196,6 +262,25 @@ export function KairoxChart() {
             </span>
           )}
         </span>
+      </div>
+      <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <div className="flex rounded-lg border border-white/10 p-0.5" role="group" aria-label="Timeframe">
+          {replay ? (
+            <span className="px-2 py-0.5 text-[11px] font-semibold text-violet-300">5s · replay</span>
+          ) : (
+            TIMEFRAME_IDS.map((tf) => (
+              <button
+                key={tf}
+                onClick={() => tf !== timeframe && setTimeframe(tf)}
+                className={`num rounded-md px-2 py-0.5 text-[11px] font-semibold ${tf === timeframe ? "bg-raised text-cyan" : "text-white/45 hover:text-white/80"}`}
+                aria-pressed={tf === timeframe}
+              >
+                {tf}
+              </button>
+            ))
+          )}
+        </div>
+        <OhlcReadout c={hovered ?? candles.at(-1)} />
       </div>
       <div ref={containerRef} className="min-h-0 flex-1" />
     </section>
