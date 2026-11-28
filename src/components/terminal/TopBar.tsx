@@ -66,6 +66,25 @@ function ModeIndicator() {
   );
 }
 
+const AVATAR_COLORS = ["#0E7490", "#047857", "#7C3AED", "#B45309", "#BE185D", "#1D4ED8", "#0F766E", "#9333EA"];
+
+/** Google-style circle with the first letter of the user's name. */
+function Avatar({ name, method, size }: { name?: string; method?: string; size: number }) {
+  const letter = (name?.trim().match(/[\p{L}\p{N}]/u)?.[0] ?? (method === "passkey" ? "P" : "K")).toUpperCase();
+  let hash = 0;
+  for (const ch of name ?? method ?? "") hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const bg = AVATAR_COLORS[hash % AVATAR_COLORS.length];
+  return (
+    <span
+      className="flex select-none items-center justify-center rounded-full font-semibold text-white"
+      style={{ width: size, height: size, background: bg, fontSize: size * 0.45 }}
+      aria-hidden
+    >
+      {letter}
+    </span>
+  );
+}
+
 function AccountButton() {
   const session = useAgentStore((s) => s.session);
   const setAuthOpen = useAgentStore((s) => s.setAuthOpen);
@@ -109,16 +128,42 @@ function AccountButton() {
 
   const badge =
     session.kind === "sandbox" ? "SANDBOX" : session.method === "google" ? "GOOGLE" : session.method === "twitter" ? "X" : session.method === "email" ? "EMAIL" : session.method === "passkey" ? "PASSKEY" : "WALLET";
+  // Social / email / passkey sign-ins get a Google-style initial avatar; wallets keep their address.
+  const isIdentity = session.kind === "privy" && session.method !== "wallet";
+  const displayName = session.name ?? session.label;
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 rounded-xl border border-white/10 bg-raised px-3 py-2 text-sm hover:bg-raised-hover">
-        <span className="rounded-md bg-cyan/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-cyan">{badge}</span>
-        <span className={`text-white/90 ${address ? "num" : ""}`}>{address ? shortAddr(address) : session.label}</span>
-      </button>
+      {isIdentity ? (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="rounded-full p-0.5 ring-1 ring-white/10 transition hover:ring-cyan/50"
+          title={[displayName, session.label].filter(Boolean).join(" · ")}
+          aria-label="Account menu"
+        >
+          <Avatar name={displayName} method={session.method} size={36} />
+        </button>
+      ) : (
+        <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 rounded-xl border border-white/10 bg-raised px-3 py-2 text-sm hover:bg-raised-hover">
+          <span className="rounded-md bg-cyan/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-cyan">{badge}</span>
+          <span className={`text-white/90 ${address ? "num" : ""}`}>{address ? shortAddr(address) : session.label}</span>
+        </button>
+      )}
       {open && (
         <div className="absolute right-0 top-12 z-40 w-72 rounded-xl border border-white/10 bg-surface p-3 shadow-2xl">
-          {session.label && <p className="mb-1 truncate text-xs text-white/50">{session.label}</p>}
+          {isIdentity ? (
+            <div className="mb-3 flex items-center gap-3">
+              <Avatar name={displayName} method={session.method} size={40} />
+              <div className="min-w-0">
+                {session.name && <p className="truncate text-sm font-semibold text-white">{session.name}</p>}
+                {session.label && <p className="truncate text-xs text-white/50">{session.label}</p>}
+                <p className="text-[10px] uppercase tracking-wider text-cyan/80">via {badge === "X" ? "X" : badge.toLowerCase()}</p>
+              </div>
+            </div>
+          ) : (
+            session.label && <p className="mb-1 truncate text-xs text-white/50">{session.label}</p>
+          )}
+          {isIdentity && address && <p className="mb-1 text-[10px] uppercase tracking-wider text-white/35">Embedded wallet</p>}
           {address && (
             <button
               onClick={() => {

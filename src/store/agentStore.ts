@@ -43,7 +43,8 @@ const MAX_LOGS = 300;
 export interface SessionInfo {
   kind: "none" | "sandbox" | "privy" | "wallet";
   method?: "google" | "twitter" | "email" | "passkey" | "wallet" | "sandbox";
-  label?: string;
+  label?: string; // email / @handle shown under the name
+  name?: string; // display name used for the avatar initial
   address?: Address;
 }
 

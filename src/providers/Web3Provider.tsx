@@ -49,9 +49,10 @@ function PrivySessionBridge({ children }: { children: ReactNode }) {
     if (authenticated && user) {
       const method = user.google ? "google" : user.twitter ? "twitter" : user.email ? "email" : user.wallet?.walletClientType === "privy" ? "passkey" : "wallet";
       const label = user.google?.email ?? (user.twitter?.username ? `@${user.twitter.username}` : undefined) ?? user.email?.address ?? undefined;
+      const name = user.google?.name ?? user.twitter?.name ?? user.twitter?.username ?? user.email?.address?.split("@")[0] ?? undefined;
       const addr = (address ?? user.wallet?.address) as `0x${string}` | undefined;
-      if (session.kind !== "privy" || session.address !== addr || session.label !== label) {
-        setSession({ kind: "privy", method, label, address: addr });
+      if (session.kind !== "privy" || session.address !== addr || session.label !== label || session.name !== name) {
+        setSession({ kind: "privy", method, label, name: name ?? undefined, address: addr });
       }
     } else if (session.kind === "privy") {
       setSession({ kind: "none" });
