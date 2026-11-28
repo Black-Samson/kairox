@@ -31,7 +31,7 @@ interface Handlers {
 }
 
 const btn =
-  "w-full flex items-center justify-center gap-3 rounded-xl border border-white/5 bg-raised py-3 text-sm font-medium text-white transition hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-40";
+  "w-full flex items-center justify-center gap-3 rounded-xl border border-white/5 bg-raised py-2.5 sm:py-3 text-sm font-medium text-white transition hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-40";
 
 function AuthButtonsView(h: Handlers) {
   const [email, setEmail] = useState("");
@@ -237,19 +237,19 @@ export function KairoxAuthModal() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#06080D]/80 p-4 backdrop-blur-md" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#06080D]/80 p-3 backdrop-blur-md sm:p-4" onClick={() => setOpen(false)}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="kx-auth-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-[420px] rounded-2xl border border-white/10 bg-surface p-7 shadow-[0_30px_80px_-20px_rgba(0,240,255,0.18)]"
+        className="relative my-auto w-full max-w-[420px] rounded-2xl border border-white/10 bg-surface p-5 shadow-[0_30px_80px_-20px_rgba(0,240,255,0.18)] sm:p-7"
       >
-        <button onClick={() => setOpen(false)} className="absolute right-4 top-4 rounded-lg p-1.5 text-white/50 hover:bg-white/5 hover:text-white" aria-label="Close">
+        <button onClick={() => setOpen(false)} className="absolute right-3 top-3 z-10 rounded-lg p-2 text-white/50 hover:bg-white/5 hover:text-white" aria-label="Close">
           <CloseIcon />
         </button>
 
-        <div className="mb-6 flex flex-col items-center text-center">
+        <div className="mb-5 flex flex-col items-center text-center sm:mb-6">
           <div className="mb-3 flex items-center gap-2">
             <KxMark size={36} />
             <span className="text-2xl font-bold tracking-tight text-white">
