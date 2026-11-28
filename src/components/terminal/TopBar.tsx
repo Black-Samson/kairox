@@ -12,6 +12,9 @@ import { fmtPct, fmtPrice, fmtSigned, pnlClass, shortAddr } from "@/lib/format";
 import { useAuthActions } from "@/providers/Web3Provider";
 import { agentStatus, realizedToday, useAgentStore } from "@/store/agentStore";
 
+const fmtCompact = (v?: number) =>
+  v === undefined ? "—" : v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : v.toFixed(0);
+
 const STATUS_STYLE = {
   SCANNING: "text-cyan border-cyan/30 bg-cyan/5",
   IN_POSITION: "text-emerald border-emerald/30 bg-emerald/5",
@@ -261,6 +264,14 @@ export function TopBar() {
           <p className="text-[10px] uppercase tracking-wider text-white/40">Ref spread</p>
           <p className={`num font-semibold ${last && last.spreadPct >= config.entrySpreadPct ? "text-emerald" : "text-white/80"}`}>{fmtPct(last?.spreadPct, 3)}</p>
         </div>
+        <div className="hidden xl:block">
+          <p className="text-[10px] uppercase tracking-wider text-white/40">24h change</p>
+          <p className={`num font-semibold ${pnlClass(last?.change24hPct ?? 0)}`}>{fmtPct(last?.change24hPct, 2)}</p>
+        </div>
+        <div className="hidden xl:block">
+          <p className="text-[10px] uppercase tracking-wider text-white/40">24h volume</p>
+          <p className="num font-semibold text-white/80">{fmtCompact(last?.volume24h)} <span className="text-[10px] text-white/40">HSK</span></p>
+        </div>
         <div className={`rounded-full border px-2.5 py-1 text-xs ${pnl24 >= 0 ? "border-emerald/30 bg-emerald/5" : "border-crimson/30 bg-crimson/5"}`}>
           <span className="text-white/50">24h PnL </span>
           <span className={`num font-semibold ${pnlClass(pnl24)}`}>{fmtSigned(pnl24)} USDT</span>
@@ -372,6 +383,10 @@ export function MobileTopBar() {
         <div className="shrink-0">
           <p className="text-[9px] uppercase tracking-wider text-white/40">Spread</p>
           <p className={`num text-sm font-semibold ${last && last.spreadPct >= config.entrySpreadPct ? "text-emerald" : "text-white/80"}`}>{fmtPct(last?.spreadPct, 2)}</p>
+        </div>
+        <div className="shrink-0">
+          <p className="text-[9px] uppercase tracking-wider text-white/40">24h chg</p>
+          <p className={`num text-sm font-semibold ${pnlClass(last?.change24hPct ?? 0)}`}>{fmtPct(last?.change24hPct, 1)}</p>
         </div>
         <div className="shrink-0">
           <p className="text-[9px] uppercase tracking-wider text-white/40">24h PnL</p>

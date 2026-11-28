@@ -172,7 +172,15 @@ export function Terminal() {
     void refreshStatus();
     setAuthOpen(true);
     const id = setInterval(() => void refreshStatus(), 20_000);
-    return () => clearInterval(id);
+    // Refresh candle history every minute so volume bars and closed candles stay accurate.
+    const hist = setInterval(() => {
+      const st = useAgentStore.getState();
+      if (st.dataSource === "live" && st.session.kind !== "none") void st.loadHistory(st.pair);
+    }, 60_000);
+    return () => {
+      clearInterval(id);
+      clearInterval(hist);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
