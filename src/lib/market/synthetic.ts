@@ -47,17 +47,22 @@ export function simulatedSpreadPct(timeMs: number): number {
 }
 
 export function syntheticCandles(endMs: number, count: number, intervalSec: number, base = SYNTHETIC_BASE_PRICE) {
-  const out: { time: number; open: number; high: number; low: number; close: number }[] = [];
+  const out: { time: number; open: number; high: number; low: number; close: number; volume: number }[] = [];
+  // Stretch time for long timeframes so a 1D chart isn't just noise.
+  const stretch = Math.max(1, intervalSec / 60);
   const end = Math.floor(endMs / 1000 / intervalSec) * intervalSec;
   for (let i = count - 1; i >= 0; i--) {
     const start = end - i * intervalSec;
-    const pts = [0, 0.25, 0.5, 0.75, 1].map((f) => syntheticRefPrice((start + f * intervalSec) * 1000, base));
+    const pts = [0, 0.25, 0.5, 0.75, 1].map((f) =>
+      syntheticRefPrice((end - (end - start - f * intervalSec) / stretch) * 1000, base),
+    );
     out.push({
       time: start,
       open: pts[0],
       close: pts[pts.length - 1],
       high: Math.max(...pts) * (1 + hash01(start) * 0.0015),
       low: Math.min(...pts) * (1 - hash01(start + 7) * 0.0015),
+      volume: Math.round((20_000 + hash01(start + 13) * 180_000) * Math.sqrt(intervalSec / 60)),
     });
   }
   return out;

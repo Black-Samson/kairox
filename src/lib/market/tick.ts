@@ -21,6 +21,8 @@ export async function getMarketTick(pairId: PairId, tradeUsd: number): Promise<M
         refPrice: ref.price,
         spreadPct: ((ref.price - q.price) / q.price) * 100,
         priceImpactPct: q.impactPct,
+        change24hPct: ref.change24hPct,
+        volume24h: ref.volume24h,
         source: { dex: "hskswap", ref: ref.source },
       };
     } catch (err) {
@@ -31,7 +33,11 @@ export async function getMarketTick(pairId: PairId, tradeUsd: number): Promise<M
   return simulated(pairId, ref, now);
 }
 
-function simulated(pair: PairId, ref: { price: number; source: string }, now: number): MarketTick {
+function simulated(
+  pair: PairId,
+  ref: { price: number; source: string; change24hPct?: number; volume24h?: number },
+  now: number,
+): MarketTick {
   const spread = simulatedSpreadPct(now);
   const dexPrice = ref.price / (1 + spread / 100);
   return {
@@ -41,6 +47,8 @@ function simulated(pair: PairId, ref: { price: number; source: string }, now: nu
     refPrice: ref.price,
     spreadPct: ((ref.price - dexPrice) / dexPrice) * 100,
     priceImpactPct: 0.12,
+    change24hPct: ref.change24hPct,
+    volume24h: ref.volume24h,
     source: { dex: "simulated", ref: ref.source },
   };
 }

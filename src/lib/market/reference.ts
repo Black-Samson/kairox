@@ -5,11 +5,13 @@
 import type { PairConfig } from "@/config/pairs";
 import type { Candle } from "@/lib/agent/types";
 import { syntheticCandles, syntheticRefPrice } from "./synthetic";
+import { TIMEFRAMES, type Timeframe } from "./timeframes";
 
 const TIMEOUT_MS = 2500;
 const CACHE_MS = 3000;
 
-type RefResult = { price: number; source: string };
+type RefResult = { price: number; source: string; change24hPct?: number; volume24h?: number };
+type Quote = { price: number; change24hPct?: number; volume24h?: number };
 const cache = new Map<string, { at: number; value: RefResult }>();
 let lastLivePrice: number | undefined;
 
@@ -25,26 +27,39 @@ async function getJson(url: string): Promise<unknown> {
   }
 }
 
-const sources: Record<string, (p: PairConfig) => Promise<number>> = {
+const sources: Record<string, (p: PairConfig) => Promise<Quote>> = {
   gate: async (p) => {
     const data = (await getJson(`https://api.gateio.ws/api/v4/spot/tickers?currency_pair=${p.reference.gate}`)) as {
       last: string;
+      change_percentage?: string;
+      base_volume?: string;
     }[];
-    return Number(data[0]?.last);
+    const t = data[0];
+    return { price: Number(t?.last), change24hPct: num(t?.change_percentage), volume24h: num(t?.base_volume) };
   },
   mexc: async (p) => {
-    const data = (await getJson(`https://api.mexc.com/api/v3/ticker/price?symbol=${p.reference.mexc}`)) as { price: string };
-    return Number(data.price);
+    const t = (await getJson(`https://api.mexc.com/api/v3/ticker/24hr?symbol=${p.reference.mexc}`)) as {
+      lastPrice: string;
+      priceChangePercent?: string;
+      volume?: string;
+    };
+    // MEXC reports the change as a fraction (0.0123 = 1.23%).
+    const ch = num(t.priceChangePercent);
+    return { price: Number(t.lastPrice), change24hPct: ch === undefined ? undefined : ch * 100, volume24h: num(t.volume) };
   },
   coingecko: async (p) => {
     const id = p.reference.coingeckoId;
-    const data = (await getJson(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`)) as Record<
-      string,
-      { usd: number }
-    >;
-    return Number(data[id]?.usd);
+    const data = (await getJson(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd&include_24hr_change=true`,
+    )) as Record<string, { usd: number; usd_24h_change?: number }>;
+    return { price: Number(data[id]?.usd), change24hPct: data[id]?.usd_24h_change };
   },
 };
+
+function num(v: string | number | undefined): number | undefined {
+  const n = Number(v);
+  return v === undefined || v === "" || !Number.isFinite(n) ? undefined : n;
+}
 
 function sourceOrder(): string[] {
   const env = process.env.REFERENCE_SOURCES; // e.g. "gate,mexc,coingecko"
@@ -60,9 +75,10 @@ export async function getReferencePrice(pair: PairConfig, now = Date.now()): Pro
   if (process.env.REFERENCE_OFFLINE !== "1") {
     for (const name of sourceOrder()) {
       try {
-        const price = await sources[name](pair);
+        const q = await sources[name](pair);
+        const price = q.price;
         if (Number.isFinite(price) && price > 0) {
-          const value = { price, source: name };
+          const value = { ...q, source: name };
           lastLivePrice = price;
           cache.set(key, { at: now, value });
           return value;
@@ -80,41 +96,43 @@ export async function getReferencePrice(pair: PairConfig, now = Date.now()): Pro
 
 export async function getReferenceHistory(
   pair: PairConfig,
-  count = 120,
-  intervalSec = 60,
-): Promise<{ candles: Candle[]; source: string }> {
+  timeframe: Timeframe = "1m",
+  count = 200,
+): Promise<{ candles: Candle[]; source: string; timeframe: Timeframe }> {
+  const tf = TIMEFRAMES[timeframe];
   if (process.env.REFERENCE_OFFLINE !== "1") {
     try {
       const data = (await getJson(
-        `https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${pair.reference.gate}&interval=1m&limit=${count}`,
+        `https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${pair.reference.gate}&interval=${tf.gate}&limit=${count}`,
       )) as string[][];
       // gate: [t, quoteVol, close, high, low, open, baseVol, closed]
       const candles = data
-        .map((r) => ({ time: Number(r[0]), close: +r[2], high: +r[3], low: +r[4], open: +r[5] }))
+        .map((r) => ({ time: Number(r[0]), close: +r[2], high: +r[3], low: +r[4], open: +r[5], volume: +r[6] }))
         .filter((c) => c.close > 0)
         .sort((a, b) => a.time - b.time);
-      if (candles.length > 10) return { candles, source: "gate" };
+      if (candles.length > 10) return { candles, source: "gate", timeframe };
     } catch (err) {
       console.warn(`[kairox] Gate history failed: ${(err as Error).message}`);
     }
     try {
       const data = (await getJson(
-        `https://api.mexc.com/api/v3/klines?symbol=${pair.reference.mexc}&interval=1m&limit=${count}`,
+        `https://api.mexc.com/api/v3/klines?symbol=${pair.reference.mexc}&interval=${tf.mexc}&limit=${count}`,
       )) as (string | number)[][];
-      // mexc: [openTime(ms), open, high, low, close, ...]
+      // mexc: [openTime(ms), open, high, low, close, volume, ...]
       const candles = data.map((r) => ({
         time: Math.floor(Number(r[0]) / 1000),
         open: +r[1],
         high: +r[2],
         low: +r[3],
         close: +r[4],
+        volume: +r[5],
       }));
-      if (candles.length > 10) return { candles, source: "mexc" };
+      if (candles.length > 10) return { candles, source: "mexc", timeframe };
     } catch (err) {
       console.warn(`[kairox] MEXC history failed: ${(err as Error).message}`);
     }
   }
   // Anchor the synthetic history to the CURRENT reference price so it joins the live candles.
   const ref = await getReferencePrice(pair);
-  return { candles: syntheticCandles(Date.now(), count, intervalSec, ref.price), source: "synthetic" };
+  return { candles: syntheticCandles(Date.now(), count, tf.sec, ref.price), source: "synthetic", timeframe };
 }
