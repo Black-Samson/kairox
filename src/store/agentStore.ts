@@ -6,6 +6,7 @@ import type { Address } from "viem";
 import { PAIRS, type PairId } from "@/config/pairs";
 import { computeSignal, describeSignal } from "@/lib/agent/signals";
 import {
+  clampConfigPatch,
   DEFAULT_CONFIG,
   evaluateExit,
   stopLossPrice,
@@ -213,6 +214,25 @@ export const useAgentStore = create<AgentState>()(
 
       const agentSay = (text: string, changes?: string[]) =>
         set((s) => ({ chat: [...s.chat, { id: uid(), role: "agent" as const, text, time: Date.now(), changes }].slice(-100) }));
+
+      /** In live mode, settings can never exceed the vault's on-chain limits (the vault would reject the trade). */
+      function fitConfigToVault() {
+        const vault = get().serverStatus?.vault;
+        if (!vault) return;
+        const cfg = get().config;
+        const { patch, notes } = clampConfigPatch(
+          { maxTradeUsd: cfg.maxTradeUsd, maxSlippagePct: cfg.maxSlippagePct, dailyLossLimitUsd: cfg.dailyLossLimitUsd },
+          {
+            maxTradeUsd: vault.limits.maxTradeQuote,
+            maxSlippagePct: vault.limits.maxSlippagePct,
+            dailyLossLimitUsd: vault.limits.dailyLossLimitQuote,
+          },
+        );
+        const changed = (Object.keys(patch) as (keyof typeof patch)[]).filter((k) => patch[k] !== cfg[k]);
+        if (!changed.length) return;
+        set((s) => ({ config: { ...s.config, ...patch } }));
+        log({ pair: get().pair, kind: "INFO", summary: `Settings capped to your vault's on-chain limits: ${notes.join("; ")}` });
+      }
 
       async function exitPosition(position: Position, reason: ExitReason, tick?: MarketTick) {
         const s = get();
@@ -444,11 +464,15 @@ export const useAgentStore = create<AgentState>()(
           log({ pair: get().pair, kind: "INFO", summary: `Judge Sandbox started with ${SANDBOX_START_USD} simulated USDT. No wallet or gas needed.` });
         },
         signOut: () => set({ session: { kind: "none" }, executionMode: "sandbox", ownerSession: undefined }),
-        setServerStatus: (serverStatus) => set({ serverStatus }),
+        setServerStatus: (serverStatus) => {
+          set({ serverStatus });
+          if (get().executionMode === "live") fitConfigToVault();
+        },
         enableLive: (ownerSession) => {
           const vault = get().serverStatus?.vault;
           set({ ownerSession, executionMode: "live", cashUsd: vault?.quoteBalance ?? 0, positions: [], equityCurve: [] });
           log({ pair: get().pair, kind: "INFO", summary: "Live trading enabled — the agent now trades through your KairoxVault on HashKey Chain." });
+          fitConfigToVault();
         },
         disableLive: () => {
           set({ executionMode: "sandbox", ownerSession: undefined });
@@ -497,6 +521,10 @@ export const useAgentStore = create<AgentState>()(
         },
 
         loadHistory: async (pair) => {
+          const loadOnce = (retried: boolean) => loadHistoryImpl(pair, retried);
+          return loadOnce(false);
+
+          async function loadHistoryImpl(pair: PairId, retried: boolean): Promise<void> {
           const s = get();
           if (s.dataSource === "replay") {
             const now = Date.now();
@@ -514,9 +542,16 @@ export const useAgentStore = create<AgentState>()(
           try {
             const res = await fetch(`/api/market/history?pair=${encodeURIComponent(pair)}`);
             const data = (await res.json()) as { candles: Candle[]; source: string };
-            set((st) => ({ candles: { ...st.candles, [pair]: data.candles }, candleSource: data.source }));
+            // Keep any live candles already built from ticks that are newer than the history.
+            set((st) => {
+              const lastHist = data.candles.at(-1)?.time ?? 0;
+              const newer = st.candles[pair].filter((c) => c.time > lastHist);
+              return { candles: { ...st.candles, [pair]: [...data.candles, ...newer] }, candleSource: data.source };
+            });
+            if (data.candles.length < 10 && !retried) setTimeout(() => void loadOnce(true), 5000);
           } catch {
-            /* chart will build from ticks */
+            if (!retried) setTimeout(() => void loadOnce(true), 5000);
+          }
           }
         },
 
