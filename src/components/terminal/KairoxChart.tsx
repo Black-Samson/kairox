@@ -169,7 +169,7 @@ export function KairoxChart() {
   }, [receipts, pair, candles, interval]);
 
   return (
-    <section className="card relative flex min-h-[320px] flex-col p-4">
+    <section className="card relative flex min-h-[300px] flex-col p-3 sm:p-4">
       <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         <h2 className="card-title">{pair} · HSKSwap</h2>
         <span className="num text-sm text-white">{fmtPrice(last?.dexPrice)}</span>
@@ -184,7 +184,7 @@ export function KairoxChart() {
             <span className="num text-white/70">{Math.round(signal.score * 100)}</span>
           </span>
         )}
-        <span className="ml-auto flex items-center gap-3 text-[10px] text-white/40">
+        <span className="ml-auto hidden items-center gap-3 text-[10px] text-white/40 sm:flex">
           <span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dotted border-white/50" /> reference</span>
           <span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-cyan" /> entry</span>
           <span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-crimson" /> SL</span>
