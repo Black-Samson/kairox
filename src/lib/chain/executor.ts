@@ -19,7 +19,7 @@ import { activeChain } from "@/config/chains";
 import { contracts, hskswapFeeTier, hskswapVersion } from "@/config/contracts";
 import type { PairConfig } from "@/config/pairs";
 import { swapRouter02Abi, swapRouterV1Abi, v2RouterAbi } from "./abis";
-import { getPublicClient } from "./client";
+import { getPublicClient, rpcUrls } from "./client";
 import { kairoxVaultAbi } from "./kairoxVaultAbi";
 import { quoteExactIn, tokenDecimals } from "./quoter";
 
@@ -38,13 +38,11 @@ export function agentAddress(): Address | undefined {
 }
 
 function walletClient() {
-  const urls = process.env.HSK_RPC_URL
-    ? [process.env.HSK_RPC_URL, ...activeChain.rpcUrls.default.http]
-    : [...activeChain.rpcUrls.default.http];
+  const urls = rpcUrls();
   return createWalletClient({
     account: agentAccount(),
     chain: activeChain,
-    transport: fallback(urls.map((u) => http(u, { timeout: 15000 }))),
+    transport: fallback(urls.map((u) => http(u, { timeout: 20_000, retryCount: 2 }))),
   });
 }
 

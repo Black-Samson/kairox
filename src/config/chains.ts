@@ -5,7 +5,7 @@ export const hashkeyMainnet = defineChain({
   name: "HashKey Chain",
   nativeCurrency: { name: "HashKey Platform Token", symbol: "HSK", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://mainnet.hsk.xyz", "https://hsk-mainnet.hashkey.com"] },
+    default: { http: ["https://mainnet.hsk.xyz"] },
   },
   blockExplorers: {
     default: { name: "HashKey Explorer", url: "https://explorer.hsk.xyz" },
@@ -17,7 +17,7 @@ export const hashkeyTestnet = defineChain({
   name: "HashKey Chain Testnet",
   nativeCurrency: { name: "HashKey Platform Token", symbol: "HSK", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://testnet.hsk.xyz", "https://hashkeychain-testnet.alt.technology"] },
+    default: { http: ["https://testnet.hsk.xyz"] },
   },
   blockExplorers: {
     default: { name: "HashKey Testnet Explorer", url: "https://testnet-explorer.hsk.xyz" },
