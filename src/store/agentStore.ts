@@ -33,6 +33,7 @@ import type {
 } from "@/lib/agent/types";
 import type { OwnerSession } from "@/lib/chain/session";
 import { REPLAY_LENGTH, replayTick } from "@/lib/market/replay";
+import { REPLAY_INTERVAL_SEC, TIMEFRAMES, type Timeframe } from "@/lib/market/timeframes";
 import type { VaultStatus } from "@/lib/chain/executor";
 
 export const SANDBOX_START_USD = 1000;
@@ -78,6 +79,7 @@ interface AgentState {
   ticks: Record<PairId, MarketTick[]>;
   candles: Record<PairId, Candle[]>;
   candleSource: string;
+  timeframe: Timeframe;
   candleIntervalSec: number;
   signals: Partial<Record<PairId, SignalSnapshot>>;
 
@@ -101,6 +103,7 @@ interface AgentState {
   disableLive: () => void;
   setPair: (p: PairId) => void;
   setDataSource: (d: DataSource) => void;
+  setTimeframe: (tf: Timeframe) => void;
   setConfig: (patch: Partial<RiskConfig>) => void;
   setPaused: (paused: boolean) => void;
   loadHistory: (pair: PairId) => Promise<void>;
@@ -187,7 +190,7 @@ function mergeCandle(candles: Candle[], price: number, timeMs: number, interval:
   }
   if (last && bucket < last.time) return candles;
   const open = last ? last.close : price;
-  return [...candles, { time: bucket, open, close: price, high: Math.max(open, price), low: Math.min(open, price) }].slice(-500);
+  return [...candles, { time: bucket, open, close: price, high: Math.max(open, price), low: Math.min(open, price), volume: 0 }].slice(-500);
 }
 
 async function executeLive(
@@ -440,6 +443,7 @@ export const useAgentStore = create<AgentState>()(
         candles: emptyByPair<Candle[]>(() => []),
         candleSource: "",
         candleIntervalSec: 60,
+        timeframe: "1m" as Timeframe,
         signals: {},
         cashUsd: SANDBOX_START_USD,
         positions: [],
@@ -489,7 +493,7 @@ export const useAgentStore = create<AgentState>()(
             replayStep: 0,
             ticks: emptyByPair<MarketTick[]>(() => []),
             candles: emptyByPair<Candle[]>(() => []),
-            candleIntervalSec: dataSource === "replay" ? 5 : 60,
+            candleIntervalSec: dataSource === "replay" ? REPLAY_INTERVAL_SEC : TIMEFRAMES[get().timeframe].sec,
           });
           if (dataSource === "replay" && get().executionMode === "live") set({ executionMode: "sandbox" });
           void get().loadHistory(get().pair);
@@ -501,6 +505,11 @@ export const useAgentStore = create<AgentState>()(
                 ? "Replay mode: a scripted 3-minute market that triggers take-profit, stop-loss, a skipped premium and a convergence exit. Sandbox fills only."
                 : "Live market data.",
           });
+        },
+        setTimeframe: (timeframe) => {
+          if (get().dataSource === "replay") return; // replay always plays 5-second candles
+          set({ timeframe, candleIntervalSec: TIMEFRAMES[timeframe].sec, candles: emptyByPair<Candle[]>(() => []) });
+          void get().loadHistory(get().pair);
         },
         setConfig: (patch) => {
           set((s) => ({ config: { ...s.config, ...patch } }));
@@ -541,7 +550,9 @@ export const useAgentStore = create<AgentState>()(
             return;
           }
           try {
-            const res = await fetch(`/api/market/history?pair=${encodeURIComponent(pair)}`);
+            // Keep the candle interval in sync with the (possibly remembered) timeframe.
+            if (s.candleIntervalSec !== TIMEFRAMES[s.timeframe].sec) set({ candleIntervalSec: TIMEFRAMES[s.timeframe].sec });
+            const res = await fetch(`/api/market/history?pair=${encodeURIComponent(pair)}&tf=${s.timeframe}`);
             const data = (await res.json()) as { candles: Candle[]; source: string };
             // Keep any live candles already built from ticks that are newer than the history.
             set((st) => {
@@ -697,7 +708,7 @@ export const useAgentStore = create<AgentState>()(
       name: "kairox-agent",
       version: 1,
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ config: s.config, pair: s.pair }),
+      partialize: (s) => ({ config: s.config, pair: s.pair, timeframe: s.timeframe }),
     },
   ),
 );
