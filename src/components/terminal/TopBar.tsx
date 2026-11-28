@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useBalance, useReadContract } from "wagmi";
 import { formatUnits } from "viem";
-import { KairoxLogo } from "@/components/brand/KairoxLogo";
+import { KairoxLogo, KxMark } from "@/components/brand/KairoxLogo";
 import { activeChain } from "@/config/chains";
 import { contracts } from "@/config/contracts";
 import { PAIR_IDS, type PairId } from "@/config/pairs";
@@ -48,7 +48,7 @@ function ModeIndicator() {
         {label}
       </button>
       {open && status && (
-        <div className="absolute left-0 top-9 z-40 w-80 rounded-xl border border-white/10 bg-surface p-3 text-xs text-white/70 shadow-2xl">
+        <div className="absolute left-0 top-9 z-40 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-surface p-3 text-xs text-white/70 shadow-2xl">
           <p className="mb-2 font-semibold text-white">Network: {activeChain.name} ({activeChain.id})</p>
           <p>Market data: {status.marketMode === "onchain" ? `HSKSwap ${status.hskswapVersion.toUpperCase()} on-chain quotes` : "external reference + simulated DEX"}</p>
           <p>Copilot: {status.llm ? "LLM" : "rule-based parser (no LLM_API_KEY)"}</p>
@@ -85,7 +85,7 @@ function Avatar({ name, method, size }: { name?: string; method?: string; size: 
   );
 }
 
-function AccountButton() {
+function AccountButton({ compact = false }: { compact?: boolean }) {
   const session = useAgentStore((s) => s.session);
   const setAuthOpen = useAgentStore((s) => s.setAuthOpen);
   const signOut = useAgentStore((s) => s.signOut);
@@ -120,8 +120,11 @@ function AccountButton() {
 
   if (session.kind === "none") {
     return (
-      <button onClick={() => setAuthOpen(true)} className="rounded-xl border border-cyan/40 bg-cyan/10 px-4 py-2 text-sm font-semibold text-cyan transition hover:bg-cyan/20">
-        Sign In / Connect
+      <button
+        onClick={() => setAuthOpen(true)}
+        className={`rounded-xl border border-cyan/40 bg-cyan/10 font-semibold text-cyan transition hover:bg-cyan/20 ${compact ? "h-9 px-3 text-xs" : "px-4 py-2 text-sm"}`}
+      >
+        {compact ? "Sign in" : "Sign In / Connect"}
       </button>
     );
   }
@@ -137,20 +140,30 @@ function AccountButton() {
       {isIdentity ? (
         <button
           onClick={() => setOpen((v) => !v)}
-          className="rounded-full p-0.5 ring-1 ring-white/10 transition hover:ring-cyan/50"
+          className="shrink-0 rounded-full p-0.5 ring-1 ring-white/10 transition hover:ring-cyan/50"
           title={[displayName, session.label].filter(Boolean).join(" · ")}
           aria-label="Account menu"
         >
-          <Avatar name={displayName} method={session.method} size={36} />
+          <Avatar name={displayName} method={session.method} size={compact ? 32 : 36} />
         </button>
       ) : (
-        <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 rounded-xl border border-white/10 bg-raised px-3 py-2 text-sm hover:bg-raised-hover">
-          <span className="rounded-md bg-cyan/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-cyan">{badge}</span>
-          <span className={`text-white/90 ${address ? "num" : ""}`}>{address ? shortAddr(address) : session.label}</span>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className={`flex items-center gap-2 rounded-xl border border-white/10 bg-raised text-sm hover:bg-raised-hover ${compact ? "h-9 px-2" : "px-3 py-2"}`}
+        >
+          {/* Phones: wallets show just the short address, the sandbox just its badge. */}
+          {(!compact || !address) && (
+            <span className="rounded-md bg-cyan/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-cyan">{badge}</span>
+          )}
+          {(!compact || address) && (
+            <span className={`text-white/90 ${address ? "num" : ""} ${compact ? "text-xs" : ""}`}>
+              {address ? (compact ? `${address.slice(0, 5)}…${address.slice(-3)}` : shortAddr(address)) : session.label}
+            </span>
+          )}
         </button>
       )}
       {open && (
-        <div className="absolute right-0 top-12 z-40 w-72 rounded-xl border border-white/10 bg-surface p-3 shadow-2xl">
+        <div className="absolute right-0 top-12 z-40 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-surface p-3 shadow-2xl">
           {isIdentity ? (
             <div className="mb-3 flex items-center gap-3">
               <Avatar name={displayName} method={session.method} size={40} />
@@ -289,6 +302,100 @@ export function TopBar() {
         </button>
         <AccountButton />
       </div>
+    </header>
+  );
+}
+
+/** Compact two-row header for phones: identity + safety controls on top, live numbers below. */
+export function MobileTopBar() {
+  const pair = useAgentStore((s) => s.pair);
+  const setPair = useAgentStore((s) => s.setPair);
+  const last = useAgentStore((s) => s.ticks[s.pair].at(-1));
+  const closed = useAgentStore((s) => s.closed);
+  const paused = useAgentStore((s) => s.paused);
+  const positions = useAgentStore((s) => s.positions);
+  const config = useAgentStore((s) => s.config);
+  const setPaused = useAgentStore((s) => s.setPaused);
+  const emergencyClose = useAgentStore((s) => s.emergencyClose);
+  const dataSource = useAgentStore((s) => s.dataSource);
+  const setDataSource = useAgentStore((s) => s.setDataSource);
+  const session = useAgentStore((s) => s.session);
+  const status = agentStatus({ paused, positions, closed, config });
+  const pnl24 = closed.filter((c) => Date.now() - c.closedAt < 86_400_000).reduce((a, c) => a + c.realizedPnlUsd, 0);
+
+  return (
+    <header className="card space-y-2.5 px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <KxMark size={26} className="shrink-0 max-[359px]:hidden" />
+        <select
+          value={pair}
+          onChange={(e) => setPair(e.target.value as PairId)}
+          className="shrink-0 rounded-lg border border-white/10 bg-raised px-1.5 py-1 font-semibold text-white outline-none"
+          aria-label="Trading pair"
+        >
+          {PAIR_IDS.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <button
+            onClick={() => setPaused(!paused)}
+            className={`flex h-9 w-9 items-center justify-center rounded-lg border ${paused ? "border-emerald/50 text-emerald" : "border-amber-300/50 text-amber-300"}`}
+            aria-label={paused ? "Resume the agent" : "Pause the agent"}
+            title={paused ? "Resume" : "Pause"}
+          >
+            {paused ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M7 4v16l13-8z" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
+            )}
+          </button>
+          <button
+            onClick={() => void emergencyClose()}
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-crimson text-white shadow-[0_0_16px_-4px_rgba(244,63,94,0.7)]"
+            aria-label="Emergency close: pause and close every position"
+            title="Emergency Close"
+          >
+            <span className="h-3 w-3 rounded-[2px] bg-white" />
+          </button>
+          <AccountButton compact />
+        </div>
+      </div>
+
+      <div className="no-scrollbar -mx-3 flex items-center gap-3 overflow-x-auto px-3">
+        <div className="shrink-0">
+          <p className="text-[9px] uppercase tracking-wider text-white/40">HSKSwap</p>
+          <p className="num text-sm font-semibold text-white">{fmtPrice(last?.dexPrice)}</p>
+        </div>
+        <div className="shrink-0">
+          <p className="text-[9px] uppercase tracking-wider text-white/40">Spread</p>
+          <p className={`num text-sm font-semibold ${last && last.spreadPct >= config.entrySpreadPct ? "text-emerald" : "text-white/80"}`}>{fmtPct(last?.spreadPct, 2)}</p>
+        </div>
+        <div className="shrink-0">
+          <p className="text-[9px] uppercase tracking-wider text-white/40">24h PnL</p>
+          <p className={`num text-sm font-semibold ${pnlClass(pnl24)}`}>{fmtSigned(pnl24)}</p>
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <span className={`flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold tracking-wider ${session.kind === "none" ? "border-white/10 text-white/40" : STATUS_STYLE[status]}`}>
+            <span className={`h-1.5 w-1.5 rounded-full bg-current ${status === "SCANNING" && session.kind !== "none" ? "kx-pulse" : ""}`} />
+            {session.kind === "none" ? "IDLE" : status === "IN_POSITION" ? "IN POS" : status}
+          </span>
+          <div className="flex rounded-lg border border-white/10 p-0.5 text-[10px]">
+            {(["live", "replay"] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => d !== dataSource && setDataSource(d)}
+                className={`rounded-md px-2 py-1.5 font-semibold uppercase tracking-wider ${dataSource === d ? "bg-raised text-white" : "text-white/40"}`}
+              >
+                {d === "live" ? "Live" : "Replay"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <ModeIndicator />
     </header>
   );
 }
