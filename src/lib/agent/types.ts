@@ -24,6 +24,7 @@ export interface Candle {
   high: number;
   low: number;
   close: number;
+  volume?: number; // base-token volume (HSK) for the bucket, when the source provides it
 }
 
 export interface MarketTick {
@@ -34,6 +35,8 @@ export interface MarketTick {
   spreadPct: number; // (ref - dex) / dex * 100 ; positive = DEX is cheap
   liquidityUsd?: number;
   priceImpactPct?: number; // estimated impact for maxTradeUsd
+  change24hPct?: number; // reference market 24h change, %
+  volume24h?: number; // reference market 24h volume, in HSK
   source: {
     dex: "hskswap" | "simulated" | "replay";
     ref: string; // e.g. "gate", "mexc", "coingecko", "synthetic", "replay"
