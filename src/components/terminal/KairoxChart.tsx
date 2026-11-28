@@ -9,6 +9,7 @@ import {
   CrosshairMode,
   LineSeries,
   LineStyle,
+  type AutoscaleInfo,
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
@@ -61,7 +62,14 @@ export function KairoxChart() {
       },
       crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
-      timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: true },
+      timeScale: {
+        borderColor: "rgba(255,255,255,0.08)",
+        timeVisible: true,
+        secondsVisible: true,
+        barSpacing: 9,
+        minBarSpacing: 3,
+        rightOffset: 6,
+      },
       localization: { priceFormatter: (p: number) => fmtPrice(p) },
     });
     const candleSeries = chart.addSeries(CandlestickSeries, {
@@ -72,6 +80,15 @@ export function KairoxChart() {
       wickUpColor: EMERALD,
       wickDownColor: CRIMSON,
       priceFormat: { type: "price", precision: 5, minMove: 0.00001 },
+      // Keep at least ±1.5% around the price so tiny moves don't fill the whole chart.
+      autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
+        const res = original();
+        if (!res || !res.priceRange) return res;
+        const { minValue, maxValue } = res.priceRange;
+        const mid = (minValue + maxValue) / 2;
+        const half = Math.max((maxValue - minValue) / 2, mid * 0.015);
+        return { ...res, priceRange: { minValue: mid - half, maxValue: mid + half } };
+      },
     });
     const refSeries = chart.addSeries(LineSeries, {
       color: "rgba(255,255,255,0.35)",
