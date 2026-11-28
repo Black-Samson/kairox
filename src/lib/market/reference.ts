@@ -94,8 +94,8 @@ export async function getReferenceHistory(
         .filter((c) => c.close > 0)
         .sort((a, b) => a.time - b.time);
       if (candles.length > 10) return { candles, source: "gate" };
-    } catch {
-      /* fall through */
+    } catch (err) {
+      console.warn(`[kairox] Gate history failed: ${(err as Error).message}`);
     }
     try {
       const data = (await getJson(
@@ -110,9 +110,11 @@ export async function getReferenceHistory(
         close: +r[4],
       }));
       if (candles.length > 10) return { candles, source: "mexc" };
-    } catch {
-      /* fall through */
+    } catch (err) {
+      console.warn(`[kairox] MEXC history failed: ${(err as Error).message}`);
     }
   }
-  return { candles: syntheticCandles(Date.now(), count, intervalSec, lastLivePrice), source: "synthetic" };
+  // Anchor the synthetic history to the CURRENT reference price so it joins the live candles.
+  const ref = await getReferencePrice(pair);
+  return { candles: syntheticCandles(Date.now(), count, intervalSec, ref.price), source: "synthetic" };
 }
